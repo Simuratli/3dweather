@@ -34,9 +34,11 @@ const fragmentShader = `
 `;
 type Props = {
   onPick?: (lat: number, lon: number) => void;
+  onHover?: (lat: number, lon: number) => void;
+  onHoverEnd?: () => void;
 };
 
-const Globe = ({ onPick }: Props) => {
+const Globe = ({ onPick, onHover, onHoverEnd }: Props) => {
   const ref = useRef<Group>(null);
 
   const [dayMap, nightMap] = useTexture([
@@ -65,7 +67,13 @@ const Globe = ({ onPick }: Props) => {
     e.stopPropagation();
     const { lat, lon } = vector3ToLatLon(e.point);
     onPick?.(lat, lon);
-  }}>
+  }}
+        onPointerMove={(e) => {
+          const { lat, lon } = vector3ToLatLon(e.point);
+          onHover?.(lat, lon);
+        }}
+        onPointerOut={() => onHoverEnd?.()}
+      >
         <sphereGeometry args={[1, 64, 64]} />
         <shaderMaterial
           vertexShader={vertexShader}

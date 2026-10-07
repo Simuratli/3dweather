@@ -37,16 +37,10 @@ export function findCountry(
   countries: CountryFeature[],
   lat: number,
   lon: number
-): string | null {
+): CountryFeature | null {
   for (const country of countries) {
-    const { geometry } = country;
-    const polygons =
-      geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
-
-    for (const polygon of polygons) {
-      if (pointInPolygon(lon, lat, polygon)) {
-        return country.properties.NAME_TR || country.properties.NAME;
-      }
+    for (const polygon of polygonsOf(country.geometry)) {
+      if (pointInPolygon(lon, lat, polygon)) return country;
     }
   }
   return null;
@@ -63,4 +57,17 @@ export function useCountries() {
   }, []);
 
   return countries;
+}
+
+
+function polygonsOf(geometry: Geometry): Polygon[] {
+  return geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+}
+
+export function ringsOf(geometry: Geometry): Ring[] {
+  return polygonsOf(geometry).flat();
+}
+
+export function countryName(country: CountryFeature) {
+  return country.properties.NAME_TR || country.properties.NAME;
 }

@@ -12,6 +12,8 @@ export type WindMeta = {
 
 export type WindField = {
   meta: WindMeta;
+  // RGBA, satır 0 = 90° K; R = u, G = v (uMin..uMax / vMin..vMax aralığına ölçekli)
+  pixels: Uint8ClampedArray;
   getWind: (lat: number, lon: number) => { u: number; v: number };
 };
 
@@ -49,7 +51,7 @@ export async function loadWind(): Promise<WindField> {
     return { u, v };
   }
 
-  return { meta, getWind };
+  return { meta, pixels, getWind };
 }
 
 export function useWind() {

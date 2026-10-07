@@ -1,4 +1,5 @@
 import type { WindField } from "../../utils/wind";
+import type { Place } from "../../utils/place";
 
 const DIRECTIONS = [
   "Kuzey", "Kuzeydoğu", "Doğu", "Güneydoğu",
@@ -9,12 +10,22 @@ type Props = {
   lat: number;
   lon: number;
   country: string | null;
+  place: Place | null;
+  placeLoading: boolean;
   wind: WindField;
   onClose: () => void;
 };
 
 
-const InfoPanel = ({ lat, lon, country, wind, onClose }: Props) => {
+const InfoPanel = ({
+  lat,
+  lon,
+  country,
+  place,
+  placeLoading,
+  wind,
+  onClose,
+}: Props) => {
   const { u, v } = wind.getWind(lat, lon);
   const speedKmh = Math.hypot(u, v) * 3.6;
   const fromDeg = ((Math.atan2(-u, -v) * 180) / Math.PI + 360) % 360;
@@ -23,12 +34,22 @@ const InfoPanel = ({ lat, lon, country, wind, onClose }: Props) => {
   const latText = `${Math.abs(lat).toFixed(2)}° ${lat >= 0 ? "K" : "G"}`;
   const lonText = `${Math.abs(lon).toFixed(2)}° ${lon >= 0 ? "D" : "B"}`;
 
+  const title = country ?? place?.water ?? "Açık deniz";
+  const cityText = place?.city
+    ? [place.city, place.region].filter(Boolean).join(", ")
+    : null;
+
   return (
     <div className="absolute bottom-6 left-1/2 w-72 -translate-x-1/2 rounded-2xl border border-white/10 bg-slate-900/80 p-4 text-white shadow-xl backdrop-blur">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs text-slate-400">Seçilen nokta</p>
-          <p className="text-lg font-semibold">{country ?? "Açık deniz"}</p>
+          <p className="text-lg font-semibold">{title}</p>
+          {placeLoading ? (
+            <p className="text-sm text-slate-400 animate-pulse">Konum aranıyor…</p>
+          ) : (
+            cityText && <p className="text-sm text-slate-300">{cityText}</p>
+          )}
           <p className="text-lg font-semibold">
             {latText}, {lonText}
           </p>
