@@ -10,6 +10,9 @@ import {
   WindParticles,
   InfoPanel,
   CountryBorders,
+  SearchBox,
+  CameraFlight,
+  type FlightTarget,
 } from "./components";
 import {
   useCountries,
@@ -28,6 +31,8 @@ function App() {
   const [selected, setSelected] = useState<Selected>(null);
   // findCountry aynı ülke için aynı nesneyi döndürür, React gereksiz render yapmaz
   const [hovered, setHovered] = useState<CountryFeature | null>(null);
+  // Uçuş sürerken dolu; aynı şehri tekrar seçince de uçsun diye id taşır
+  const [flight, setFlight] = useState<FlightTarget | null>(null);
 
   const country =
     selected && countries
@@ -76,7 +81,13 @@ function App() {
           </mesh>
         )}
 
-        <OrbitControls enablePan={false} minDistance={1.3} maxDistance={6} />
+        <OrbitControls
+          enabled={!flight}
+          enablePan={false}
+          minDistance={1.3}
+          maxDistance={6}
+        />
+        <CameraFlight target={flight} onDone={() => setFlight(null)} />
         <Stats />
 
         <EffectComposer>
@@ -88,6 +99,13 @@ function App() {
           />
         </EffectComposer>
       </Canvas>
+
+      <SearchBox
+        onSelect={({ lat, lon }) => {
+          setSelected({ lat, lon });
+          setFlight({ lat, lon, id: Date.now() });
+        }}
+      />
 
       {selected && wind && (
         <InfoPanel
