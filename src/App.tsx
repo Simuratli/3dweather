@@ -4,12 +4,21 @@ import { OrbitControls, Stats } from "@react-three/drei";
 import { Globe, Atmosphere, WindParticles, InfoPanel } from "./components";
 import { latLonToVector3 } from "./utils/geo";
 import { useWind } from "./utils/wind";
+import { useCountries, findCountry } from "./utils/countries";
 
 type Selected = { lat: number; lon: number } | null;
 
 function App() {
+  
   const wind = useWind();
+  const countries = useCountries();
+
   const [selected, setSelected] = useState<Selected>(null);
+
+  const country =
+    selected && countries
+      ? findCountry(countries, selected.lat, selected.lon)
+      : null;
 
   return (
     <div className="relative h-full">
@@ -40,6 +49,7 @@ function App() {
         <InfoPanel
           lat={selected.lat}
           lon={selected.lon}
+          country={country}
           wind={wind}
           onClose={() => setSelected(null)}
         />

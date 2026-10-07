@@ -8,11 +8,13 @@ const DIRECTIONS = [
 type Props = {
   lat: number;
   lon: number;
+  country: string | null;
   wind: WindField;
   onClose: () => void;
 };
 
-const InfoPanel = ({ lat, lon, wind, onClose }: Props) => {
+
+const InfoPanel = ({ lat, lon, country, wind, onClose }: Props) => {
   const { u, v } = wind.getWind(lat, lon);
   const speedKmh = Math.hypot(u, v) * 3.6;
   const fromDeg = ((Math.atan2(-u, -v) * 180) / Math.PI + 360) % 360;
@@ -26,6 +28,7 @@ const InfoPanel = ({ lat, lon, wind, onClose }: Props) => {
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs text-slate-400">Seçilen nokta</p>
+          <p className="text-lg font-semibold">{country ?? "Açık deniz"}</p>
           <p className="text-lg font-semibold">
             {latText}, {lonText}
           </p>
