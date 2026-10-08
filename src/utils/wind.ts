@@ -8,13 +8,16 @@ export type WindMeta = {
   uMax: number;
   vMin: number;
   vMax: number;
+  // true ise B kanalı veri maskesi: 255 = veri var, 0 = yok (ör. akıntıda kara)
+  masked?: boolean;
 };
 
+// Rüzgar ve okyanus akıntısı aynı biçimdeki vektör alanlarıdır
 export type WindField = {
   meta: WindMeta;
   // RGBA, satır 0 = 90° K; R = u, G = v (uMin..uMax / vMin..vMax aralığına ölçekli)
   pixels: Uint8ClampedArray;
-  getWind: (lat: number, lon: number) => { u: number; v: number };
+  getWind: (lat: number, lon: number) => { u: number; v: number; valid: boolean };
 };
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -26,9 +29,9 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-export async function loadWind(): Promise<WindField> {
-  const meta: WindMeta = await fetch("/data/wind.json").then((r) => r.json());
-  const img = await loadImage("/data/wind.png");
+export async function loadWind(name = "wind"): Promise<WindField> {
+  const meta: WindMeta = await fetch(`/data/${name}.json`).then((r) => r.json());
+  const img = await loadImage(`/data/${name}.png`);
 
   const canvas = document.createElement("canvas");
   canvas.width = meta.width;
@@ -48,18 +51,27 @@ export async function loadWind(): Promise<WindField> {
     const i = (y * meta.width + x) * 4;
     const u = meta.uMin + (pixels[i] / 255) * (meta.uMax - meta.uMin);
     const v = meta.vMin + (pixels[i + 1] / 255) * (meta.vMax - meta.vMin);
-    return { u, v };
+    const valid = !meta.masked || pixels[i + 2] >= 128;
+    return { u, v, valid };
   }
 
   return { meta, pixels, getWind };
 }
 
-export function useWind() {
-  const [wind, setWind] = useState<WindField | null>(null);
+// enabled false iken indirilmez; ilk açılışta bir kez yüklenir
+export function useWind(name = "wind", enabled = true) {
+  const [field, setField] = useState<WindField | null>(null);
 
   useEffect(() => {
-    loadWind().then(setWind).catch(console.error);
-  }, []);
+    if (!enabled || field) return;
+    let cancelled = false;
+    loadWind(name)
+      .then((f) => !cancelled && setField(f))
+      .catch(console.error);
+    return () => {
+      cancelled = true;
+    };
+  }, [name, enabled, field]);
 
-  return wind;
+  return field;
 }

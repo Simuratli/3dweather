@@ -1,5 +1,7 @@
 import type { WindField } from "../../utils/wind";
 import type { Place } from "../../utils/place";
+import type { Weather } from "../../utils/weather";
+import WeatherDetails from "./WeatherDetails";
 
 const DIRECTIONS = [
   "Kuzey", "Kuzeydoğu", "Doğu", "Güneydoğu",
@@ -12,6 +14,8 @@ type Props = {
   country: string | null;
   place: Place | null;
   placeLoading: boolean;
+  weather: Weather | null;
+  weatherLoading: boolean;
   wind: WindField;
   onClose: () => void;
 };
@@ -23,6 +27,8 @@ const InfoPanel = ({
   country,
   place,
   placeLoading,
+  weather,
+  weatherLoading,
   wind,
   onClose,
 }: Props) => {
@@ -40,7 +46,8 @@ const InfoPanel = ({
     : null;
 
   return (
-    <div className="absolute bottom-6 left-1/2 w-72 -translate-x-1/2 rounded-2xl border border-white/10 bg-slate-900/80 p-4 text-white shadow-xl backdrop-blur">
+    // Mobilde altta, geniş ekranda sağ kenarda; uzun içerik kaydırılır
+    <div className="absolute right-4 bottom-4 left-4 max-h-[60%] overflow-y-auto rounded-2xl border border-white/10 bg-slate-900/80 p-4 text-white shadow-xl backdrop-blur sm:top-4 sm:bottom-auto sm:left-auto sm:max-h-[calc(100%-2rem)] sm:w-80">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs text-slate-400">Seçilen nokta</p>
@@ -50,7 +57,7 @@ const InfoPanel = ({
           ) : (
             cityText && <p className="text-sm text-slate-300">{cityText}</p>
           )}
-          <p className="text-lg font-semibold">
+          <p className="text-xs text-slate-400 tabular-nums">
             {latText}, {lonText}
           </p>
         </div>
@@ -63,7 +70,12 @@ const InfoPanel = ({
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <WeatherDetails weather={weather} loading={weatherLoading} />
+
+      <p className="mt-5 mb-2 text-xs font-medium tracking-wide text-slate-400 uppercase">
+        Rüzgar akışı (harita)
+      </p>
+      <div className="grid grid-cols-2 gap-3">
         <div>
           <p className="text-xs text-slate-400">Rüzgar hızı</p>
           <p className="text-2xl font-bold">
@@ -85,7 +97,9 @@ const InfoPanel = ({
         </div>
       </div>
 
-      <p className="mt-3 text-xs text-slate-500">Veri: {wind.meta.date}</p>
+      <p className="mt-3 text-xs text-slate-500">
+        Rüzgar verisi: {wind.meta.date} · Hava durumu: Open-Meteo
+      </p>
     </div>
   );
 };

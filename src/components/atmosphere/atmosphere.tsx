@@ -91,7 +91,7 @@ const Atmosphere = () => {
       },
       haze: {
         ...shared,
-        uIntensity: { value: 0.75 },
+        uIntensity: { value: 0.45 },
       },
     };
   }, []);

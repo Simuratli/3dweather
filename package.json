@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "update-wind": "node scripts/update-wind.mjs"
+    "update-wind": "node scripts/update-wind.mjs",
+    "update-weather": "node scripts/update-weather.mjs",
+    "update-currents": "node scripts/update-currents.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

@@ -5,14 +5,22 @@ const windGlsl = /* glsl */ `
 
   uniform sampler2D uWind;
   uniform vec4 uWindRange; // uMin, uMax, vMin, vMax
+  uniform bool uMasked;    // B kanalı veri maskesi mi (ör. akıntıda kara = 0)
+
+  vec2 fieldUv(float lat, float lon) {
+    return vec2((lon + 180.0) / 360.0, (90.0 - lat) / 180.0);
+  }
 
   vec2 windAt(float lat, float lon) {
-    vec2 uv = vec2((lon + 180.0) / 360.0, (90.0 - lat) / 180.0);
-    vec2 rg = texture2D(uWind, uv).rg;
+    vec2 rg = texture2D(uWind, fieldUv(lat, lon)).rg;
     return vec2(
       mix(uWindRange.x, uWindRange.y, rg.x),
       mix(uWindRange.z, uWindRange.w, rg.y)
     );
+  }
+
+  bool hasData(float lat, float lon) {
+    return !uMasked || texture2D(uWind, fieldUv(lat, lon)).b >= 0.5;
   }
 `;
 
@@ -43,7 +51,7 @@ export const simFragment = /* glsl */ `
     float lat = s.x, lon = s.y, age = s.z, life = s.w;
 
     vec2 seed = gl_FragCoord.xy + uSeed;
-    bool respawn = uInit || age <= 0.0 || abs(lat) > 85.0;
+    bool respawn = uInit || age <= 0.0 || abs(lat) > 85.0 || !hasData(lat, lon);
 
     if (respawn) {
       // Küre yüzeyine eşit dağılım için enlem asin ile
@@ -73,18 +81,17 @@ export const particleVertex = /* glsl */ `
   uniform float uSpeed;
   uniform float uStep;
   uniform float uRadius;
+  uniform float uMaxSpeed;  // bu hızda (m/s) ve üstünde renk uColors[2] olur
+  uniform vec3 uColors[3];  // yavaş, orta, hızlı
 
   varying vec3 vColor;
   varying float vAlpha;
 
   vec3 speedColor(float speed) {
-    float t = min(speed / 20.0, 1.0);
-    if (t < 0.5) {
-      float k = t / 0.5;
-      return vec3(0.2 + 0.2 * k, 0.5 + 0.5 * k, 1.0 - 0.2 * k);
-    }
-    float k = (t - 0.5) / 0.5;
-    return vec3(0.4 + 0.6 * k, 1.0 - 0.1 * k, 0.8 - 0.4 * k);
+    float t = min(speed / uMaxSpeed, 1.0);
+    return t < 0.5
+      ? mix(uColors[0], uColors[1], t / 0.5)
+      : mix(uColors[1], uColors[2], (t - 0.5) / 0.5);
   }
 
   void main() {

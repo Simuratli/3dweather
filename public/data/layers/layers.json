@@ -1,0 +1,38 @@
+{
+  "source": "NOAA GFS 1° (NOMADS)",
+  "date": "2026-10-08T03:00:00.000Z",
+  "width": 360,
+  "height": 181,
+  "layers": {
+    "temperature": {
+      "min": -40,
+      "max": 45,
+      "unit": "°C",
+      "encoding": "linear"
+    },
+    "humidity": {
+      "min": 0,
+      "max": 100,
+      "unit": "%",
+      "encoding": "linear"
+    },
+    "clouds": {
+      "min": 0,
+      "max": 100,
+      "unit": "%",
+      "encoding": "linear"
+    },
+    "precipitation": {
+      "min": 0,
+      "max": 10,
+      "unit": "mm/sa",
+      "encoding": "sqrt"
+    },
+    "pressure": {
+      "min": 950,
+      "max": 1050,
+      "unit": "hPa",
+      "encoding": "linear16"
+    }
+  }
+}

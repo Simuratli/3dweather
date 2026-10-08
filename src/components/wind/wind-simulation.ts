@@ -1,6 +1,7 @@
 import {
   AdditiveBlending,
   BufferAttribute,
+  Color,
   DataTexture,
   FloatType,
   InstancedBufferGeometry,
@@ -28,11 +29,31 @@ import {
 
 const SEGMENTS = 12; // iz başına çizgi parçası
 const STEP = 0.06; // iz noktaları arası süre (sn)
-const SPEED = 0.3; // m/s -> derece/sn
 const RADIUS = 1.005;
-const OPACITY = 0.5;
 const MAX_DT = 0.05;
 const DEG = Math.PI / 180;
+
+export type FlowStyle = {
+  speed: number; // m/s -> derece/sn
+  maxSpeed: number; // renk ölçeğinin üst ucu (m/s)
+  colors: [Color, Color, Color]; // yavaş, orta, hızlı
+  opacity: number;
+};
+
+export const WIND_STYLE: FlowStyle = {
+  speed: 0.3,
+  maxSpeed: 20,
+  colors: [new Color(0.2, 0.5, 1.0), new Color(0.4, 1.0, 0.8), new Color(1.0, 0.9, 0.4)],
+  opacity: 0.5,
+};
+
+// Akıntılar rüzgardan ~20 kat yavaş: görünür olsun diye hız büyütülür
+export const CURRENT_STYLE: FlowStyle = {
+  speed: 6,
+  maxSpeed: 1.2,
+  colors: [new Color(0.1, 0.35, 0.55), new Color(0.25, 0.8, 0.95), new Color(0.9, 1.0, 1.0)],
+  opacity: 0.6,
+};
 
 // GPU: 131.072 parçacık. CPU yedeği her karede JS'te döndüğü için daha az.
 const GPU_SIZE = { width: 512, height: 256 };
@@ -76,7 +97,9 @@ function createWindTexture(wind: WindField) {
 function createGpuBackend(
   renderer: WebGLRenderer,
   windTexture: Texture,
-  windRange: Vector4
+  windRange: Vector4,
+  speed: number,
+  masked: boolean
 ): Backend {
   const { width, height } = GPU_SIZE;
   const targetOptions = {
@@ -97,9 +120,10 @@ function createGpuBackend(
     uniforms: {
       uWind: { value: windTexture },
       uWindRange: { value: windRange },
+      uMasked: { value: masked },
       uState: { value: targets[0].texture },
       uDt: { value: 0 },
-      uSpeed: { value: SPEED },
+      uSpeed: { value: speed },
       uSeed: { value: 0 },
       uInit: { value: true },
     },
@@ -143,7 +167,7 @@ function createGpuBackend(
 }
 
 // simFragment ile aynı mantık, JS'te
-function createCpuBackend(wind: WindField): Backend {
+function createCpuBackend(wind: WindField, speed: number): Backend {
   const { width, height } = CPU_SIZE;
   const count = width * height;
   const state = new Float32Array(count * 4);
@@ -170,18 +194,18 @@ function createCpuBackend(wind: WindField): Backend {
     step(dt) {
       for (let o = 0; o < state.length; o += 4) {
         const lat = state[o];
-        if (state[o + 2] <= 0 || Math.abs(lat) > 85) {
+        const { u, v, valid } = wind.getWind(lat, state[o + 1]);
+        if (state[o + 2] <= 0 || Math.abs(lat) > 85 || !valid) {
           spawn(o, false);
           continue;
         }
 
-        const { u, v } = wind.getWind(lat, state[o + 1]);
         const cosLat = Math.max(Math.cos(lat * DEG), 0.1);
-        let lon = state[o + 1] + (u * SPEED * dt) / cosLat;
+        let lon = state[o + 1] + (u * speed * dt) / cosLat;
         if (lon > 180) lon -= 360;
         if (lon < -180) lon += 360;
 
-        state[o] = lat + v * SPEED * dt;
+        state[o] = lat + v * speed * dt;
         state[o + 1] = lon;
         state[o + 2] -= dt;
       }
@@ -208,7 +232,8 @@ function createTrailGeometry(count: number) {
 // Float dokuya çizim (EXT_color_buffer_float) yoksa simülasyon CPU'ya düşer
 export function createWindSimulation(
   renderer: WebGLRenderer,
-  wind: WindField
+  wind: WindField,
+  style: FlowStyle = WIND_STYLE
 ): WindSimulation {
   const mode: WindSimulationMode = renderer.extensions.has(
     "EXT_color_buffer_float"
@@ -220,10 +245,12 @@ export function createWindSimulation(
   const { uMin, uMax, vMin, vMax } = wind.meta;
   const windRange = new Vector4(uMin, uMax, vMin, vMax);
 
+  const masked = wind.meta.masked ?? false;
+
   const backend =
     mode === "gpu"
-      ? createGpuBackend(renderer, windTexture, windRange)
-      : createCpuBackend(wind);
+      ? createGpuBackend(renderer, windTexture, windRange, style.speed, masked)
+      : createCpuBackend(wind, style.speed);
   const count = backend.width * backend.height;
 
   const material = new ShaderMaterial({
@@ -233,11 +260,14 @@ export function createWindSimulation(
     uniforms: {
       uWind: { value: windTexture },
       uWindRange: { value: windRange },
+      uMasked: { value: masked },
       uState: { value: backend.texture },
-      uSpeed: { value: SPEED },
+      uSpeed: { value: style.speed },
       uStep: { value: STEP },
       uRadius: { value: RADIUS },
-      uOpacity: { value: OPACITY },
+      uMaxSpeed: { value: style.maxSpeed },
+      uColors: { value: style.colors },
+      uOpacity: { value: style.opacity },
     },
     transparent: true,
     blending: AdditiveBlending,

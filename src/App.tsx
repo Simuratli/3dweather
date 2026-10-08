@@ -13,7 +13,20 @@ import {
   SearchBox,
   CameraFlight,
   type FlightTarget,
+  FieldLayer,
+  SatelliteClouds,
+  Isobars,
+  LayerControl,
+  Legend,
+  type LayerState,
 } from "./components";
+import { CURRENT_STYLE } from "./components/wind/wind-simulation";
+import {
+  satelliteDate,
+  useLayersMeta,
+  usePressureCenters,
+  usePressureTexture,
+} from "./utils/layers";
 import {
   useCountries,
   findCountry,
@@ -21,11 +34,25 @@ import {
   type CountryFeature,
 } from "./utils/countries";
 import { usePlace } from "./utils/place";
+import { useWeather } from "./utils/weather";
 
 type Selected = { lat: number; lon: number } | null;
 
 function App() {
+  const [layers, setLayers] = useState<LayerState>({
+    fill: "none",
+    wind: true,
+    currents: false,
+    pressure: false,
+  });
+  const [satDate] = useState(satelliteDate);
+
+  // Rüzgar bilgi panelinde de kullanıldığı için her zaman yüklenir
   const wind = useWind();
+  const currents = useWind("currents", layers.currents);
+  const layersMeta = useLayersMeta();
+  const pressureCenters = usePressureCenters(layers.pressure);
+  const pressureTexture = usePressureTexture(layers.pressure);
   const countries = useCountries();
 
   const [selected, setSelected] = useState<Selected>(null);
@@ -40,6 +67,10 @@ function App() {
       : null;
 
   const { place, loading: placeLoading } = usePlace(
+    selected?.lat ?? null,
+    selected?.lon ?? null
+  );
+  const { weather, loading: weatherLoading } = useWeather(
     selected?.lat ?? null,
     selected?.lon ?? null
   );
@@ -65,6 +96,24 @@ function App() {
           />
         </Suspense>
         <Atmosphere />
+
+        {/* Katman verisi gelene kadar diğer sahne beklemesin */}
+        <Suspense fallback={null}>
+          {layersMeta &&
+            layers.fill !== "none" &&
+            layers.fill !== "satellite" && (
+              <FieldLayer id={layers.fill} meta={layersMeta} />
+            )}
+          {layers.fill === "satellite" && <SatelliteClouds date={satDate} />}
+          {layersMeta && pressureTexture && layers.pressure && (
+            <Isobars
+              meta={layersMeta}
+              data={pressureTexture}
+              centers={pressureCenters}
+            />
+          )}
+        </Suspense>
+
         {countries && (
           <CountryBorders
             countries={countries}
@@ -72,7 +121,10 @@ function App() {
             hovered={hovered}
           />
         )}
-        {wind && <WindParticles wind={wind} />}
+        {wind && layers.wind && <WindParticles wind={wind} />}
+        {currents && layers.currents && (
+          <WindParticles wind={currents} style={CURRENT_STYLE} />
+        )}
 
         {selected && (
           <mesh position={latLonToVector3(selected.lat, selected.lon, 1.01)}>
@@ -100,6 +152,14 @@ function App() {
         </EffectComposer>
       </Canvas>
 
+      <LayerControl value={layers} onChange={setLayers} />
+      <Legend
+        fill={layers.fill}
+        pressure={layers.pressure}
+        meta={layersMeta}
+        satelliteDate={satDate}
+      />
+
       <SearchBox
         onSelect={({ lat, lon }) => {
           setSelected({ lat, lon });
@@ -114,6 +174,8 @@ function App() {
           country={country ? countryName(country) : null}
           place={place}
           placeLoading={placeLoading}
+          weather={weather}
+          weatherLoading={weatherLoading}
           wind={wind}
           onClose={() => setSelected(null)}
         />
