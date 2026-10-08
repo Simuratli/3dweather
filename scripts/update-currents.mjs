@@ -2,8 +2,9 @@
 // Çıktı rüzgarla aynı biçimde: public/data/currents.{png,json}
 // R = u, G = v, B = 255 deniz / 0 kara (veri yok)
 //
-// Ücretsiz kota günde 10.000, dakikada 600 nokta; 4° ızgara ~3.600 nokta
-// tutar ve istekler bir dakika arayla gönderilir (~7 dakika).
+// Ücretsiz kota: dakikada 600, saatte 5.000, günde 10.000 nokta. Kara noktaları
+// atlanınca 4° ızgara ~2.400 nokta tutar; istekler bir dakika arayla gider (~4 dk).
+// Akıntılar yavaş değiştiği için veri 12 saatten yeniyse indirme atlanır (--force ile zorla).
 import fs from "node:fs/promises";
 import { PNG } from "pngjs";
 
@@ -12,9 +13,49 @@ const STEP = 4; // derece
 const MAX_LAT = 78; // daha kuzey/güney neredeyse tamamen buz ve kara
 const BATCH = 500; // URL uzunluğu sınırı
 const WAIT_MS = 61_000;
+const MAX_AGE_HOURS = 12;
 
 const WIDTH = 360 / STEP;
 const HEIGHT = 180 / STEP;
+
+const force = process.argv.includes("--force");
+if (!force) {
+  try {
+    const previous = JSON.parse(await fs.readFile(`${OUT_DIR}/currents.json`, "utf8"));
+    const ageHours = (Date.now() - new Date(`${previous.date}Z`).getTime()) / 3600_000;
+    if (ageHours < MAX_AGE_HOURS) {
+      console.log(
+        `Akıntı verisi ${ageHours.toFixed(1)} saatlik (${previous.date} UTC), güncel sayılır. ` +
+          "Yine de indirmek için: npm run update-currents -- --force"
+      );
+      process.exit(0);
+    }
+  } catch {
+    // Önceki veri yok ya da okunamadı: indir
+  }
+}
+
+// Kara noktaları için istek harcama: ülke sınırlarının içindeki noktaları atla
+function inRing(lon, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+const geo = JSON.parse(await fs.readFile(`${OUT_DIR}/geo.json`, "utf8"));
+const polygons = geo.features.flatMap((f) =>
+  f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates
+);
+const isLand = (lat, lon) =>
+  polygons.some(
+    (p) => inRing(lon, lat, p[0]) && !p.slice(1).some((hole) => inRing(lon, lat, hole))
+  );
 
 // Örnekler piksel merkezlerinde, böylece GPU'daki lineer örneklemeyle hizalı
 const points = [];
@@ -22,7 +63,34 @@ for (let y = 0; y < HEIGHT; y++) {
   const lat = 90 - STEP * y - STEP / 2;
   if (Math.abs(lat) > MAX_LAT) continue;
   for (let x = 0; x < WIDTH; x++) {
-    points.push({ x, y, lat, lon: -180 + STEP * x + STEP / 2 });
+    const lon = -180 + STEP * x + STEP / 2;
+    if (!isLand(lat, lon)) points.push({ x, y, lat, lon });
+  }
+}
+
+// Kota dolunca yığın izi değil, sade bir mesaj gösterilsin diye ayrı tür
+class QuotaError extends Error {}
+
+async function fetchBatch(url) {
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(url);
+    if (res.ok) return res.json();
+
+    const body = await res.text();
+    // Dakika sınırı birkaç saniyede açılır; saat/gün sınırını beklemek anlamsız
+    if (res.status === 429 && /minutely/i.test(body) && attempt < 3) {
+      console.log("  Dakika sınırı, 60 sn bekleniyor…");
+      await new Promise((r) => setTimeout(r, WAIT_MS));
+      continue;
+    }
+    if (res.status === 429) {
+      const period = /daily/i.test(body) ? "günlük" : "saatlik";
+      throw new QuotaError(
+        `Open-Meteo ${period} kotası doldu. Mevcut akıntı verisi korunuyor; ` +
+          `${period === "günlük" ? "yarın" : "bir saat sonra"} tekrar deneyin.`
+      );
+    }
+    throw new Error(`İstek başarısız (${res.status}): ${body}`);
   }
 }
 
@@ -31,7 +99,7 @@ const v = new Float32Array(WIDTH * HEIGHT);
 const ocean = new Uint8Array(WIDTH * HEIGHT);
 
 const batches = Math.ceil(points.length / BATCH);
-console.log(`${points.length} nokta, ${batches} istek (~${batches} dakika)`);
+console.log(`${points.length} deniz noktası, ${batches} istek (~${batches} dakika)`);
 
 let date = null;
 for (let b = 0; b < batches; b++) {
@@ -43,9 +111,14 @@ for (let b = 0; b < batches; b++) {
     `?latitude=${batch.map((p) => p.lat).join(",")}` +
     `&longitude=${batch.map((p) => p.lon).join(",")}` +
     "&current=ocean_current_velocity,ocean_current_direction";
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`İstek başarısız (${res.status}): ${await res.text()}`);
-  const results = await res.json();
+  let results;
+  try {
+    results = await fetchBatch(url);
+  } catch (err) {
+    if (!(err instanceof QuotaError)) throw err;
+    console.error(err.message);
+    process.exit(1);
+  }
 
   results.forEach((r, i) => {
     const { x, y } = batch[i];

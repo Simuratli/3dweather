@@ -8,9 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "update-wind": "node scripts/update-wind.mjs",
+    "update-wind": "node scripts/update-weather.mjs",
     "update-weather": "node scripts/update-weather.mjs",
-    "update-currents": "node scripts/update-currents.mjs"
+    "update-currents": "node scripts/update-currents.mjs",
+    "update-satellites": "node scripts/update-satellites.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
@@ -20,6 +21,7 @@
     "postprocessing": "^6.39.5",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "satellite.js": "^7.1.0",
     "tailwindcss": "^4.3.3",
     "three": "^0.186.1"
   },

@@ -19,7 +19,11 @@ import {
   LayerControl,
   Legend,
   type LayerState,
+  Earthquakes,
+  SatelliteLayer,
 } from "./components";
+import { useEarthquakes } from "./utils/earthquakes";
+import { useSatellites } from "./utils/satellites";
 import { CURRENT_STYLE } from "./components/wind/wind-simulation";
 import {
   satelliteDate,
@@ -44,6 +48,8 @@ function App() {
     wind: true,
     currents: false,
     pressure: false,
+    earthquakes: false,
+    satellites: false,
   });
   const [satDate] = useState(satelliteDate);
 
@@ -53,6 +59,8 @@ function App() {
   const layersMeta = useLayersMeta();
   const pressureCenters = usePressureCenters(layers.pressure);
   const pressureTexture = usePressureTexture(layers.pressure);
+  const quakeFeed = useEarthquakes(layers.earthquakes);
+  const satellites = useSatellites(layers.satellites);
   const countries = useCountries();
 
   const [selected, setSelected] = useState<Selected>(null);
@@ -125,6 +133,12 @@ function App() {
         {currents && layers.currents && (
           <WindParticles wind={currents} style={CURRENT_STYLE} />
         )}
+        {quakeFeed && layers.earthquakes && (
+          <Earthquakes quakes={quakeFeed.quakes} updated={quakeFeed.updated} />
+        )}
+        {satellites && layers.satellites && (
+          <SatelliteLayer satellites={satellites} />
+        )}
 
         {selected && (
           <mesh position={latLonToVector3(selected.lat, selected.lon, 1.01)}>
@@ -137,7 +151,8 @@ function App() {
           enabled={!flight}
           enablePan={false}
           minDistance={1.3}
-          maxDistance={6}
+          // Yerdurağan uydular 6,6 Dünya yarıçapında: halkayı görmek için uzaklaşabilsin
+          maxDistance={layers.satellites ? 16 : 6}
         />
         <CameraFlight target={flight} onDone={() => setFlight(null)} />
         <Stats />
@@ -158,6 +173,8 @@ function App() {
         pressure={layers.pressure}
         meta={layersMeta}
         satelliteDate={satDate}
+        quakes={layers.earthquakes ? quakeFeed : null}
+        satellites={layers.satellites ? satellites : null}
       />
 
       <SearchBox

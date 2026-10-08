@@ -6,6 +6,8 @@ export type LayerState = {
   wind: boolean;
   currents: boolean;
   pressure: boolean;
+  earthquakes: boolean;
+  satellites: boolean;
 };
 
 const FILLS: { id: FillLayerId; label: string }[] = [
@@ -17,10 +19,12 @@ const FILLS: { id: FillLayerId; label: string }[] = [
   { id: "satellite", label: "Uydu bulutları" },
 ];
 
-const OVERLAYS: { key: "wind" | "currents" | "pressure"; label: string }[] = [
+const OVERLAYS: { key: Exclude<keyof LayerState, "fill">; label: string }[] = [
   { key: "wind", label: "Rüzgar akışı" },
   { key: "currents", label: "Okyanus akıntıları" },
   { key: "pressure", label: "Basınç çizgileri" },
+  { key: "earthquakes", label: "Depremler (24 sa)" },
+  { key: "satellites", label: "Uydular (canlı)" },
 ];
 
 type Props = {

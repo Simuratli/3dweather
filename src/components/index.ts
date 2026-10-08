@@ -5,6 +5,8 @@ export { default as InfoPanel } from './info';
 export { default as CountryBorders } from './country-borders';
 export { default as SearchBox } from './search';
 export { default as CameraFlight, type FlightTarget } from './camera';
+export { default as Earthquakes } from './earthquakes';
+export { default as SatelliteLayer } from './satellites';
 export {
   FieldLayer,
   SatelliteClouds,
